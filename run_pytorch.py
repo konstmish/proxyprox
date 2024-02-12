@@ -2,17 +2,14 @@ import argparse
 import numpy as np
 import torch
 import torchvision
-import wandb
 
-from torch.optim.optimizer import Optimizer, required
 from torch.optim import AdamW, SGD
-import torchvision.models as models
 import torchvision.transforms as transforms
 
 import resnet
 from proxyprox import ProxyProx
 from runner import run_proxyprox
-from utils import load_data, accuracy_and_loss, net_weights_norm, seed_everything
+from utils import load_data, seed_everything
 
 parser = argparse.ArgumentParser(description='Argument Parser')
 parser.add_argument('--gpu-id', type=int, help='ID of the GPU to be used', default=0)
@@ -23,7 +20,6 @@ opt_name = args.opt
 
 device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
 
-N_train = 50000
 batch_size = 128
 
 trainloader, testloader, num_classes = load_data(batch_size=batch_size)
@@ -101,23 +97,23 @@ elif opt_name == 'adam':
     l2 = False
     opt = AdamW(net.parameters(), lr=lr, weight_decay=weight_decay)
     method = f'adam_lr_{lr}'
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=T_cosine, eta_min=lr / 2000)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=n_epoch, eta_min=lr / 2000)
 
 if scheduler is not None:
-    method += f'_cos_{T_cosine}'
+    method += f'_cos_{n_epoch}'
 if weight_decay > 0:
     method += '_l2' if l2 else '_wd'
     method += f'_{weight_decay}'
 
 if opt_name == 'proxyprox':
     run_proxyprox(
-        trainloader=trainloader, testloader=testloader, subsetloader=subsetloader,
-        net=net, device=device, n_epoch=n_epoch, optimizer=opt, noisy_train_stat=False, run_name=method,
-        scheduler=scheduler, use_wandb=True, checkpoint=60, n_epoch_in=n_epoch_in, wandb_project=wandb_project
+        net=net, trainloader=trainloader, testloader=testloader, subsetloader=subsetloader,
+        device=device, n_epoch=n_epoch, optimizer=opt, noisy_train_stat=False, run_name=method,
+        scheduler=scheduler, use_wandb=True, checkpoint=60, wandb_project=wandb_project, n_epoch_in=n_epoch_in
     )
 else:
     run(
-        net=net, trainloader=trainloader, testloader=testloader, device=device, n_epoch=n_epoch,
-        optimizer=opt, noisy_train_stat=False, criterion=criterion, N_train=N_train,
-        scheduler=scheduler, run_name=method, use_wandb=True, wandb_project=wandb_project, checkpoint=60
+        net=net, trainloader=trainloader, testloader=testloader, 
+        device=device, n_epoch=n_epoch, optimizer=opt, noisy_train_stat=False, run_name=method,
+        scheduler=scheduler, use_wandb=True, checkpoint=60, wandb_project=wandb_project
     )
